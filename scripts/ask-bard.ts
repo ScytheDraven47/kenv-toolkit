@@ -5,7 +5,9 @@ import '@johnlindquist/kit'
 import { Bard } from 'googlebard'
 
 const bardCookie = await env('BARD_COOKIE', {
-	description: `Log in to https://bard.google.com then retrieve your "__Secure-1PSID" cookie from your browser's Developer Tools -> Storage tab`,
+	hint: md(
+		`Log in to [https://bard.google.com](https://bard.google.com) then retrieve your "__Secure-1PSID" cookie from your browser's Developer Tools -> Storage tab`
+	),
 })
 
 const { conversationNames, write } = await db('ask-bard-conversation-names', {
@@ -13,13 +15,16 @@ const { conversationNames, write } = await db('ask-bard-conversation-names', {
 })
 const conversationId = await arg(
 	{
-		placeholder: 'Select a conversation',
+		placeholder: 'Start a new conversation:',
+		hint: 'Or select a previous one. Ctrl+Enter to skip.',
 		strict: false,
 		shortcuts: [
 			{
 				name: 'Skip',
 				key: 'ctrl+enter',
-				onPress: () => submit(null),
+				onPress: () => {
+					submit(null)
+				},
 				bar: 'right',
 			},
 		],
@@ -35,27 +40,68 @@ if (conversationId) {
 }
 
 const bot = new Bard(`__Secure-1PSID=${bardCookie}`)
+let currentMessage = ``
 
 await chat({
 	name: `Ask Bard - ${conversationId || 'tmp'}`,
+	shortcuts: [
+		{
+			name: 'Speak',
+			key: 'ctrl+r',
+			bar: 'right',
+			onPress: async () => {
+				const prevMessage = (await getLastBardMessage()).text
+				say(prevMessage, {})
+			},
+		},
+	],
 	onSubmit: async (prompt) => {
-		let response
-		if (conversationId) {
-			response = await bot.ask(prompt, conversationId)
-		} else {
-			response = await bot.ask(prompt)
-		}
-		let messages = await chat.getMessages()
-		chat.addMessage(response)
+		//* Instant reply
+		// let response = await bot.ask(prompt)
+		// chat.addMessage(response)
+
+		//* Typed reply
+		chat.addMessage(``)
+		await bot.askStream(
+			async (res) => {
+				currentMessage += res
+				const index = (await getLastBardMessage()).index
+				chat.setMessage(index, md(currentMessage))
+			},
+			prompt,
+			conversationId
+		)
+		currentMessage = ``
 	},
 })
 
-// Simulating response streaming
+const conversation = await chat.getMessages()
+inspect(
+	conversation
+		.map(
+			(message) =>
+				`${message.position === 'left' ? 'Bard:\n' : 'Human:\n'}${message.text}`
+		)
+		.join('\n\n')
+)
 
-// await bot.askStream(
-// 	(res) => {
-// 		inspect(res, 'ask-bard-response-stream')
-// 	},
-// 	prompt,
-// 	conversationId
-// )
+function findLastIndex<T>(
+	array: Array<T>,
+	predicate: (value: T, index: number, obj: T[]) => boolean
+): number {
+	let l = array.length
+	while (l--) {
+		if (predicate(array[l], l, array)) return l
+	}
+	return -1
+}
+
+async function getLastBardMessage() {
+	const messages = await chat.getMessages()
+	const index = findLastIndex(
+		messages,
+		(message) => message.position === 'left'
+	)
+	const message = messages[index]
+	return { index, ...message }
+}
