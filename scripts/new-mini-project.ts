@@ -47,7 +47,7 @@ await ensureFile(indexPath)
 await ensureFile(stylePath)
 await ensureFile(scriptPath)
 
-await exec(`code ${indexPath} ${stylePath} ${scriptPath}`)
+await exec(`code -n ${indexPath} ${stylePath} ${scriptPath}`)
 
 function formatProjectDirName(projectName: string): string {
 	return projectName.toLowerCase().replaceAll(' ', '-')
