@@ -1,5 +1,5 @@
 // Name: Snippet - Email
-// Snippet: @@
+// Snippet: ;@@
 
 import '@johnlindquist/kit'
 
