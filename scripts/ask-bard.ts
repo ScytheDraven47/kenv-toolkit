@@ -13,7 +13,7 @@ const bardCookie = await env('BARD_COOKIE', {
 const { conversationNames, write } = await db('ask-bard-conversation-names', {
 	conversationNames: [],
 })
-const conversationId = await arg(
+const conversationName = await arg(
 	{
 		placeholder: 'Start a new conversation:',
 		hint: 'Or select a previous one. Ctrl+Enter to skip.',
@@ -32,18 +32,21 @@ const conversationId = await arg(
 	conversationNames
 )
 
-if (conversationId) {
-	if (!conversationNames.includes(conversationId)) {
-		conversationNames.push(conversationId)
+if (conversationName) {
+	if (!conversationNames.includes(conversationName)) {
+		conversationNames.push(conversationName)
 		write()
 	}
 }
 
 const bot = new Bard(`__Secure-1PSID=${bardCookie}`)
+let chatName = `Ask Bard - ${conversationName || 'tmp'}`
+let conversationId = conversationName || `tmp-${new Date().toISOString()}`
+let saveFile = `ask-bard-conversation-${conversationName}${new Date().toISOString()}`
 let currentMessage = ``
 
 await chat({
-	name: `Ask Bard - ${conversationId || 'tmp'}`,
+	name: chatName,
 	shortcuts: [
 		{
 			name: 'Speak',
@@ -51,7 +54,20 @@ await chat({
 			bar: 'right',
 			onPress: async () => {
 				const prevMessage = (await getLastBardMessage()).text
-				say(prevMessage, {})
+				say(prevMessage, {
+					name: 'Microsoft Zira - English (United States)',
+					rate: 1.2,
+					pitch: 0.9,
+				})
+			},
+		},
+		{
+			name: 'Done',
+			key: 'ctrl+enter',
+			bar: 'right',
+			onPress: async () => {
+				await saveChat()
+				process.exit(0)
 			},
 		},
 	],
@@ -61,7 +77,7 @@ await chat({
 		// chat.addMessage(response)
 
 		//* Typed reply
-		chat.addMessage(``)
+		chat.addMessage(`...`)
 		await bot.askStream(
 			async (res) => {
 				currentMessage += res
@@ -75,15 +91,18 @@ await chat({
 	},
 })
 
-const conversation = await chat.getMessages()
-inspect(
-	conversation
-		.map(
-			(message) =>
-				`${message.position === 'left' ? 'Bard:\n' : 'Human:\n'}${message.text}`
-		)
-		.join('\n\n')
-)
+async function saveChat() {
+	const conversation = await chat.getMessages()
+	await inspect(
+		conversation,
+		// .map(
+		// 	(message) =>
+		// 		`${message.position === 'left' ? 'Bard:' : 'Human:'}\n${message.text}`
+		// )
+		// .join('\n\n'),
+		saveFile
+	)
+}
 
 function findLastIndex<T>(
 	array: Array<T>,
