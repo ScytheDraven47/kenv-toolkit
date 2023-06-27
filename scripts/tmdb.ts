@@ -35,6 +35,13 @@ type TMDbSearchResult = {
 	vote_count: number
 }
 
+type TMDbSearchResponse = {
+	page: number
+	results: TMDbSearchResult[]
+	total_pages: number
+	total_results: number
+}
+
 type TMDbSeriesDetails = {
 	adult: boolean
 	backdrop_path: string
@@ -99,6 +106,24 @@ type TMDbSeriesDetails = {
 	type: string
 	vote_average: number
 	vote_count: number
+}
+
+type TMDbImageDetails = {
+	aspect_ratio: number
+	height: number
+	iso_639_1: string
+	file_path: string
+	vote_average: number
+	vote_count: number
+	width: number
+}
+
+type TMDbSeriesDetailsWithImages = TMDbSeriesDetails & {
+	images: {
+		backdrops: TMDbImageDetails[]
+		logos: TMDbImageDetails[]
+		posters: TMDbImageDetails[]
+	}
 }
 
 // const selectedMediaType = await arg('Movie or Series', ['Movie', 'Series'])
@@ -175,55 +200,77 @@ function formatMediaChoices(media: TMDbSearchResult[]): Choice[] {
 	})
 }
 
-function formatMd(seriesDetails: TMDbSeriesDetails) {
+function formatMd(seriesDetails: TMDbSeriesDetailsWithImages) {
 	let releaseYear = new Date(seriesDetails.first_air_date).getFullYear()
 	let posterSrc = TMDbImagePath(seriesDetails.poster_path)
 	let backdropSrc = TMDbImagePath(seriesDetails.backdrop_path)
 	return `---
+tmdb-id: ${seriesDetails.id}
 watched: 
-release: ${releaseYear}
-finished: ${seriesDetails.status === 'Ended' ? 'true' : 'false'}
-episode-length: ${seriesDetails.episode_run_time}
-episode-count:
-${seriesDetails.seasons
-	.filter((season) => season.season_number > 0)
-	.map((season) => ` - ${season.episode_count}`)
-	.join('\n')}
-genres:
-${seriesDetails.genres
-	.map((genre) => ` - ${genre.name.toLowerCase()}`)
-	.join('\n')}
-backdrop: ${backdropSrc}
-poster: ${posterSrc}
+banner: "${backdropSrc}"
+cover: "${posterSrc}"
 ---
-
-![|300](${backdropSrc})
 
 # ${seriesDetails.name}
 
+[release:: ${releaseYear}]
+[status:: "${seriesDetails.status}"]
+[runtime:: ${seriesDetails.episode_run_time}min]
+[genres:: ${seriesDetails.genres
+		.map((genre) => `"${genre.name.toLowerCase()}"`)
+		.join(', ')}]
+
 ${seriesDetails.overview}
 
-![|300](${posterSrc})
+## Seasons
+
+| # | Season | Release | Episodes | Art |
+| - | ------ | ------- | -------- | --- |
+${seriesDetails.seasons
+	.sort((a, b) => a.season_number - b.season_number)
+	.map(
+		(season) =>
+			'| ' +
+			[
+				season.season_number,
+				season.name,
+				new Date(season.air_date).getFullYear(),
+				season.season_number === 0
+					? season.episode_count
+					: `(episode-count:: ${season.episode_count})`,
+				`![\\|50](${TMDbImagePath(season.poster_path)})`,
+			].join(' | ') +
+			' |'
+	)
+	.join('\n')}
+
+${seriesDetails.images.backdrops
+	.map((image) => `![|100](${TMDbImagePath(image.file_path)})`)
+	.join(' ')}
+
+${seriesDetails.images.logos
+	.map((image) => `![|100](${TMDbImagePath(image.file_path)})`)
+	.join(' ')}
+
+${seriesDetails.images.posters
+	.map((image) => `![|100](${TMDbImagePath(image.file_path)})`)
+	.join(' ')}
 `
 }
 
 async function searchSeries(query) {
 	let response = await fetch(TMDbUrl('/search/tv', { query }))
-	let data = (await response.json()) satisfies {
-		page: number
-		results: TMDbSearchResult[]
-		total_pages: number
-		total_results: number
-	}
+	let data = (await response.json()) satisfies TMDbSearchResponse
 
 	return data.results
 }
 
 async function getSeriesDetails(id) {
+	console.log(TMDbUrl(`/tv/${id}`, { append_to_response: 'images' }))
 	let response = await fetch(
 		TMDbUrl(`/tv/${id}`, { append_to_response: 'images' })
 	)
-	let data = (await response.json()) satisfies TMDbSeriesDetails
+	let data = (await response.json()) satisfies TMDbSeriesDetailsWithImages
 
 	return data
 }
