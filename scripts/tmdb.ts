@@ -130,7 +130,7 @@ type TMDbSeriesDetailsWithImages = TMDbSeriesDetails & {
 
 const selectedMedia = (await arg({
 	placeholder: `Search for a series`,
-	onInput: _.debounce(async (query) => {
+	onInput: debounce(async (query) => {
 		setHint('Searching...')
 		setChoices([])
 
@@ -175,8 +175,8 @@ if (flag?.poster) {
 
 const seriesDetails = await getSeriesDetails(selectedMedia.id)
 
-await editor(formatMd(seriesDetails))
-// await editor(JSON.stringify(seriesDetails, null, 2))
+let markdown = formatMd(seriesDetails)
+await editor(markdown)
 
 function formatMediaChoices(media: TMDbSearchResult[]): Choice[] {
 	return media.map((result) => {
