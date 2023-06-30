@@ -30,6 +30,7 @@ if (pathExists(finalPath)) {
 			value: false,
 			onSubmit: async () => {
 				await run('new-mini-project')
+				return ''
 			},
 		},
 		{
@@ -47,7 +48,9 @@ await ensureFile(indexPath)
 await ensureFile(stylePath)
 await ensureFile(scriptPath)
 
-await exec(`code -n ${finalPath} ${indexPath} ${stylePath} ${scriptPath}`)
+await exec(
+	`code -n "${finalPath}" "${indexPath}" "${stylePath}" "${scriptPath}"`
+)
 
 function formatProjectDirName(projectName: string): string {
 	return projectName.toLowerCase().replaceAll(' ', '-')
